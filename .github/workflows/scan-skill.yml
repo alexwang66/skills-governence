@@ -1,0 +1,98 @@
+# =============================================================
+#  Scan & Govern Skills
+#  Triggers when skill files are committed to skills-upload/
+#  Uploads to JFrog Artifactory -> Xray scans -> passes copy
+#  to skills-authorized/
+# =============================================================
+name: Scan & Govern Skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills-upload/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  JFROG_URL: ${{ secrets.JFROG_URL }}
+  JFROG_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
+
+jobs:
+  scan-and-govern:
+    runs-on: ubuntu-latest
+    steps:
+      # -------------------------------------------------- Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # -------------------------------------------------- Detect changes
+      - name: Detect changed skill files
+        id: detect
+        run: |
+          # Find added/modified .md files in skills-upload/
+          git diff --name-only --diff-filter=AM HEAD~1 HEAD -- "skills-upload/" \
+            | grep -i '\.md$' > /tmp/changed_skills.txt || true
+
+          FILE_COUNT=$(wc -l < /tmp/changed_skills.txt | tr -d ' ')
+          if [ "$FILE_COUNT" = "0" ]; then
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+            echo "No .md skill files changed in skills-upload/"
+          else
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+            echo "Changed skill files ($FILE_COUNT):"
+            cat /tmp/changed_skills.txt
+          fi
+
+      # -------------------------------------------------- Setup JFrog CLI
+      - name: Setup JFrog CLI
+        if: steps.detect.outputs.has_files == 'true'
+        uses: jfrog/setup-jfrog-cli@v4
+        with:
+          version: latest
+        env:
+          JFROG_URL: ${{ secrets.JFROG_URL }}
+          JFROG_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
+
+      # -------------------------------------------------- Upload, scan, govern
+      - name: Upload to Artifactory & scan with Xray
+        id: scan
+        if: steps.detect.outputs.has_files == 'true'
+        run: bash .github/scripts/scan_and_govern.sh
+        env:
+          # Artifactory repository name — change this to match your repo
+          ARTIFACTORY_REPO: skills-staging
+          # Maximum seconds to wait for Xray scan completion
+          MAX_SCAN_WAIT: "300"
+          # Polling interval in seconds
+          SCAN_INTERVAL: "10"
+
+      # -------------------------------------------------- Commit & push
+      - name: Commit authorized skills
+        if: always() && steps.detect.outputs.has_files == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add skills-authorized/
+
+          if git diff --cached --quiet; then
+            echo "No authorized files to commit (scans may have failed)."
+          else
+            git commit -m "chore: add JFrog-scanned authorized skills [skip ci]"
+            git push
+          fi
+
+      # -------------------------------------------------- Fail job if any scan failed
+      - name: Check scan results
+        if: always() && steps.detect.outputs.has_files == 'true'
+        run: |
+          if [ "${{ steps.scan.outcome }}" = "failure" ]; then
+            echo "::error::One or more skill files failed JFrog scanning and were NOT authorized."
+            exit 1
+          fi
+          echo "All skill files passed JFrog scanning."
