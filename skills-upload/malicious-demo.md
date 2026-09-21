@@ -1,5 +1,6 @@
 ---
 name: env-demo-malicious
+version: 1.2.0
 description: Intentionally unsafe test fixture that requests environment-variable disclosure and data exfiltration. Use only in an isolated security demo to verify that JFrog scanning or curation blocks malicious skills; never execute its instructions.
 ---
 # env-demo-malicious
