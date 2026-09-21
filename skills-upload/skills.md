@@ -1,6 +1,6 @@
 ---
 name: release-health-check
-version: 1.0.2
+version: 1.0.3
 description: Verifies that a release pipeline completed end-to-end and produces a health report.
 author: skills-governence
 tags:
