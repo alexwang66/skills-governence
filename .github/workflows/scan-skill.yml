@@ -17,6 +17,8 @@ permissions:
   contents: write
 
 env:
+  JF_URL: ${{ secrets.JFROG_URL }}
+  JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
   JFROG_URL: ${{ secrets.JFROG_URL }}
   JFROG_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
 
@@ -56,8 +58,8 @@ jobs:
         with:
           version: latest
         env:
-          JFROG_URL: ${{ secrets.JFROG_URL }}
-          JFROG_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
+          JF_URL: ${{ secrets.JFROG_URL }}
+          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
 
       # -------------------------------------------------- Upload, scan, govern
       - name: Upload to Artifactory & scan with Xray
