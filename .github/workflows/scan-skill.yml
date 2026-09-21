@@ -66,7 +66,7 @@ jobs:
         run: bash .github/scripts/scan_and_govern.sh
         env:
           # Artifactory repository name — change this to match your repo
-          ARTIFACTORY_REPO: skills-staging
+          ARTIFACTORY_REPO: alex-skills-local
           # Maximum seconds to wait for Xray scan completion
           MAX_SCAN_WAIT: "300"
           # Polling interval in seconds
